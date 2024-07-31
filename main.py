@@ -4,52 +4,28 @@ import io
 
 
 def main():
-    copy_main_py()
-    total_function_order = []
-    function_order = []
-    content_lines = []
+    # copy_main_py()
+    function_order_dict = {}
+    special_funcs = ["def to_html(self):","def props_to_html(self):"]
 
-    # Get only the content of one .py file at a time
     with open("copy_functions.txt", "r") as file:
         content = file.read()
 
-    # Extract the main function block
-    main_function = extract_function_block_from_file("main", content)
+    all_functions = extract_all_functions(content, special_funcs)
+    print(all_functions)
 
-    if main_function:
-        # print("Extracted def main() function:")
-        # print(main_function)
+    for i in range(0, 1):
+        function = all_functions[i]
+        full_function = all_functions[i].replace("def ", "").replace(":", "")
+        function_name = get_function_name(function)
+        # context_functions_list = extract_context_functions(content, function_name)
 
-        # Split the function to many lines
-        function_lines = main_function.splitlines()
+        print("-------------------")
+        print(f"full function: {full_function}")
+        print(f"function name: {function_name}")
+        # print(f"context functions list: {context_functions_list}")
 
-        # Turn functions lines into list of functions
-        function_list = get_functions(function_lines)
-        print(f"main function list: {function_list}")
-        print("---------------------------")
-        print("\n\n")
-
-        for function in function_list:
-            # Get the name of the function
-            function_name = get_function_name(function)
-
-            # Get the function block based on the name
-            function_block = extract_function_block_from_file(function_name, content)
-            print(f"Outer recursive function name: {function_name}")
-            print("---------------------------")
-            # Recursive functions to find the deepest functions and add it to function_order
-            get_function_r(function_block, content, function_order)
-
-            # function_order.insert(0,function)
-            print("---------------------------")
-            print(f"function order: {function_order}")
-            total_function_order.insert(0, function_order)
-            function_order = []
-            print(f"function order after reset: {function_order}")
-            print(f"total function order: {total_function_order}")
-
-    else:
-        print("No def main() function found.")
+    # print(f"function order dist: {function_order_dict}")
 
 
 def copy_main_py():
@@ -246,6 +222,56 @@ def get_functions(function_lines):
 
 def get_function_name(one_line_function):
     return one_line_function.split("(")[0].strip().split(" ")[-1]
+
+
+def extract_all_functions(file_content, special_funcs):
+    # Regex pattern to match function definitions
+    function_def_pattern = re.compile(r"^\s*def\s+(\w+)\s*\([^)]*\):", re.MULTILINE)
+    
+    # Regex pattern to match class definitions
+    class_def_pattern = re.compile(r"^\s*class\s+\w+:", re.MULTILINE)
+    
+    # List to store function definitions
+    functions = []
+    
+    file_like_object = io.StringIO(file_content)
+    in_class = False
+
+    for line in file_like_object:
+        # Check if we are inside a class
+        if class_def_pattern.match(line):
+            in_class = True
+        elif re.match(r"^\s*class\s+\w+:", line) and in_class:
+            in_class = False
+        
+        # Extract function definitions whether inside or outside a class
+        match = function_def_pattern.match(line)
+        if match:
+            func_name = match.group(1)
+            # Check if function name does not contain "__" twice and is not in special_funcs
+            full_signature = line.strip()
+            if func_name.count("__") < 2 :
+                if all(full_signature != special_func for special_func in special_funcs):
+                    functions.append(match.group(0))
+
+    return functions
+
+
+def insert_in_nested_dict(nested_dict, target_key, new_value):
+    stack = [(nested_dict, target_key)]
+
+    while stack:
+        current_dict, key_to_find = stack.pop()
+
+        if key_to_find in current_dict:
+            current_dict[key_to_find] = new_value
+            return True
+
+        for key, value in current_dict.items():
+            if isinstance(value, dict):
+                stack.append((value, key_to_find))
+
+    return False
 
 
 if __name__ == "__main__":
