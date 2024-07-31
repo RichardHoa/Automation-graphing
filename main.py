@@ -4,26 +4,28 @@ import io
 
 
 def main():
-    # copy_main_py()
+    copy_main_py()
     function_order_dict = {}
-    special_funcs = ["def to_html(self):","def props_to_html(self):"]
+    special_funcs = ["def to_html(self):", "def props_to_html(self):"]
 
     with open("copy_functions.txt", "r") as file:
         content = file.read()
 
     all_functions = extract_all_functions(content, special_funcs)
-    print(all_functions)
+    # print(all_functions)
 
-    for i in range(0, 1):
+    for i in range(2, 3):
         function = all_functions[i]
         full_function = all_functions[i].replace("def ", "").replace(":", "")
         function_name = get_function_name(function)
-        # context_functions_list = extract_context_functions(content, function_name)
+        context_functions_list = extract_context_functions(
+            content, function_name, all_functions
+        )
 
         print("-------------------")
         print(f"full function: {full_function}")
         print(f"function name: {function_name}")
-        # print(f"context functions list: {context_functions_list}")
+        print(f"context functions list: {context_functions_list}")
 
     # print(f"function order dist: {function_order_dict}")
 
@@ -83,6 +85,55 @@ def copy_main_py():
                 file.write("\n\n\n\n\n\n")
 
 
+def extract_context_functions(file_content, target_function_name, full_functions_list):
+
+    # Initialize a list to store function definitions that call the target function
+    context_functions = []
+    print(target_function_name)
+
+    pattern = rf'^(?!.*#).*{re.escape(target_function_name)}.*'
+    
+    # Compile the regex pattern
+    regex = re.compile(pattern, re.MULTILINE)
+    
+    # Find all matches in the file content
+    pre_matches = regex.findall(file_content)
+    
+    modified_pattern = rf'\w{re.escape(target_function_name)}\b'
+    
+    # Iterate over the list of matches
+    filtered_matches = []
+
+    for match in pre_matches:
+        # Check if the match contains 'def' and should be excluded
+        if "def" in match:
+            continue
+        
+        # Check if the target function name is modified
+        if re.search(modified_pattern, match):
+            continue
+
+        if "__" in match:
+            continue
+        
+        # If neither condition is met, keep the match
+        filtered_matches.append(match)
+        
+            
+    print(filtered_matches)
+    
+
+    
+
+
+    # file = extract_function_block_from_file(target_function_name, file_content)
+
+
+
+
+    return []
+
+
 def extract_function_block_from_file(name, file_content):
     function_def_pattern = re.compile(rf"^def {name}\([^)]*\):", re.MULTILINE)
     chunks = file_content.split("-------CUT THE READING FILE HERE------")
@@ -122,102 +173,102 @@ def extract_function_block_from_file(name, file_content):
     return None
 
 
-def get_function_r(function_block, content, function_order):
-    # Turn the function block into array of function lines
-    function_lines = function_block.splitlines()
-    # Turn function lines into list of functions
-    function_list = get_functions(function_lines)
+# def get_function_r(function_block, content, function_order):
+#     # Turn the function block into array of function lines
+#     function_lines = function_block.splitlines()
+#     # Turn function lines into list of functions
+#     function_list = get_functions(function_lines)
 
-    # print(f"function block: {function_block}")
-    # print("\n\n")
-    print(f"functions list from the block: {function_list}")
-    # print("\n\n")
+#     # print(f"function block: {function_block}")
+#     # print("\n\n")
+#     print(f"functions list from the block: {function_list}")
+#     # print("\n\n")
 
-    for function in function_list:
-        function_name = get_function_name(function)
-        print("---------------------------")
-        print("function: ", function)
-        print("function name: ", function_name)
-        function_block_code = extract_function_block_from_file(function_name, content)
-        # If function_block_code is not found -> there is no nested functions inside this function
-        if not function_block_code:
-            # If function name contains . -> it is a library function
-            if "." in function_name:
-                print(f"Library function: {function_name}")
-            # Else it's a normal function, add this to the function_order
-            else:
-                function_order.append(function)
-                print(f"Function order end: {function_order}")
-        else:
-            # print(f"block code: {function_block_code} from the function: {function_name}")
+#     for function in function_list:
+#         function_name = get_function_name(function)
+#         print("---------------------------")
+#         print("function: ", function)
+#         print("function name: ", function_name)
+#         function_block_code = extract_function_block_from_file(function_name, content)
+#         # If function_block_code is not found -> there is no nested functions inside this function
+#         if not function_block_code:
+#             # If function name contains . -> it is a library function
+#             if "." in function_name:
+#                 print(f"Library function: {function_name}")
+#             # Else it's a normal function, add this to the function_order
+#             else:
+#                 function_order.append(function)
+#                 print(f"Function order end: {function_order}")
+#         else:
+#             # print(f"block code: {function_block_code} from the function: {function_name}")
 
-            # Get the name of the funtion_block_code
-            # function_block_code_name = get_function_name(function_block_code.split("\n")[0])
+#             # Get the name of the funtion_block_code
+#             # function_block_code_name = get_function_name(function_block_code.split("\n")[0])
 
-            if function in function_block_code:
+#             if function in function_block_code:
 
-                if any(
-                    function_name == get_function_name(sublist)
-                    for sublist in function_order
-                ):
-                    print(f"Function already added:  {function_name} ")
-                    print(f"function order: {function_order}")
-                    continue
-                else:
-                    print(f"order_list: {function_order}")
-                    function_order.append(function)
-                print(f"function_block_code: {function_block_code}")
-                print(f"recursive function found:  {function_name} ")
-            else:
-                # If it's not a recursive functions, continue to find the deeper functions
-                get_function_r(function_block_code, content, function_order)
+#                 if any(
+#                     function_name == get_function_name(sublist)
+#                     for sublist in function_order
+#                 ):
+#                     print(f"Function already added:  {function_name} ")
+#                     print(f"function order: {function_order}")
+#                     continue
+#                 else:
+#                     print(f"order_list: {function_order}")
+#                     function_order.append(function)
+#                 print(f"function_block_code: {function_block_code}")
+#                 print(f"recursive function found:  {function_name} ")
+#             else:
+#                 # If it's not a recursive functions, continue to find the deeper functions
+#                 get_function_r(function_block_code, content, function_order)
 
 
-def get_functions(function_lines):
-    # function_list = []
-    # for line in function_lines:
-    #     stripped_line = line.strip()
-    #     # Check if the line represents a function
-    #     if (
-    #         stripped_line
-    #         and not stripped_line.startswith("#")
-    #         and re.search(r"\(.*\)", stripped_line)
-    #         and "def" not in stripped_line
-    #         and "print" not in stripped_line
-    #     ):
-    #         function_list.append(line)
-    # return function_list
-    function_calls = []
-    function_block = []
-    parathesis_counter = 0
+# def get_functions(function_lines):
+#     # function_list = []
+#     # for line in function_lines:
+#     #     stripped_line = line.strip()
+#     #     # Check if the line represents a function
+#     #     if (
+#     #         stripped_line
+#     #         and not stripped_line.startswith("#")
+#     #         and re.search(r"\(.*\)", stripped_line)
+#     #         and "def" not in stripped_line
+#     #         and "print" not in stripped_line
+#     #     ):
+#     #         function_list.append(line)
+#     # return function_list
+#     function_calls = []
+#     function_block = []
+#     parathesis_counter = 0
 
-    for line in function_lines:
-        stripped_line = line.strip()
-        if (
-            not stripped_line
-            or stripped_line.startswith("#")
-            or "main" in stripped_line
-        ):
-            continue
+#     for line in function_lines:
+#         stripped_line = line.strip()
+#         if (
+#             not stripped_line
+#             or stripped_line.startswith("#")
+#             or "main" in stripped_line
+#         ):
+#             continue
 
-        parathesis_counter += stripped_line.count("(") - stripped_line.count(")")
-        function_block.append(line)
+#         parathesis_counter += stripped_line.count("(") - stripped_line.count(")")
+#         function_block.append(line)
 
-        if parathesis_counter <= 0 and function_block:
-            complete_function_call = " ".join(
-                [block_line.strip() for block_line in function_block]
-            )
-            complete_function_call_name = get_function_name(complete_function_call)
-            if (
-                "(" in complete_function_call
-                and ")" in complete_function_call
-                and "_" in complete_function_call_name
-                and "." not in complete_function_call_name
-            ):
-                function_calls.append(complete_function_call)
-            function_block = []
+#         if parathesis_counter <= 0 and function_block:
+#             complete_function_call = " ".join(
+#                 [block_line.strip() for block_line in function_block]
+#             )
+#             complete_function_call_name = get_function_name(complete_function_call)
+#             if (
+#                 "(" in complete_function_call
+#                 and ")" in complete_function_call
+#                 and "_" in complete_function_call_name
+#                 and "." not in complete_function_call_name
+#             ):
+#                 function_calls.append(complete_function_call)
+#             function_block = []
 
-    return function_calls
+#     return function_calls
 
 
 def get_function_name(one_line_function):
@@ -227,13 +278,13 @@ def get_function_name(one_line_function):
 def extract_all_functions(file_content, special_funcs):
     # Regex pattern to match function definitions
     function_def_pattern = re.compile(r"^\s*def\s+(\w+)\s*\([^)]*\):", re.MULTILINE)
-    
+
     # Regex pattern to match class definitions
     class_def_pattern = re.compile(r"^\s*class\s+\w+:", re.MULTILINE)
-    
+
     # List to store function definitions
     functions = []
-    
+
     file_like_object = io.StringIO(file_content)
     in_class = False
 
@@ -243,15 +294,17 @@ def extract_all_functions(file_content, special_funcs):
             in_class = True
         elif re.match(r"^\s*class\s+\w+:", line) and in_class:
             in_class = False
-        
+
         # Extract function definitions whether inside or outside a class
         match = function_def_pattern.match(line)
         if match:
             func_name = match.group(1)
             # Check if function name does not contain "__" twice and is not in special_funcs
             full_signature = line.strip()
-            if func_name.count("__") < 2 :
-                if all(full_signature != special_func for special_func in special_funcs):
+            if func_name.count("__") < 2:
+                if all(
+                    full_signature != special_func for special_func in special_funcs
+                ):
                     functions.append(match.group(0))
 
     return functions
