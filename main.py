@@ -14,7 +14,7 @@ def main():
     all_functions = extract_all_functions(content, special_funcs)
     # print(all_functions)
 
-    for i in range(2, 3):
+    for i in range(0, 2):
         function = all_functions[i]
         full_function = all_functions[i].replace("def ", "").replace(":", "")
         function_name = get_function_name(function)
@@ -25,9 +25,21 @@ def main():
         print("-------------------")
         print(f"full function: {full_function}")
         print(f"function name: {function_name}")
-        print(f"context functions list: {context_functions_list}")
+        print(f"context functions: {context_functions_list}")
+        if len (context_functions_list) == 0:
+            function_order_dict[full_function] = {}
+        else:
+            for function in context_functions_list:
+                context_function_name = function.replace("def ", "").replace(":", "")
+                # print("context function name: " + context_function_name)
+                insert_in_nested_dict(function_order_dict, context_function_name, full_function)
+                pass
 
-    # print(f"function order dist: {function_order_dict}")
+        # for function in context_functions_list:
+        #     identation = len(function) - len(function.lstrip())
+        #     print(f"function: {function}")
+
+    print(f"function order dist: {function_order_dict}")
 
 
 def copy_main_py():
@@ -88,19 +100,20 @@ def copy_main_py():
 def extract_context_functions(file_content, target_function_name, full_functions_list):
 
     # Initialize a list to store function definitions that call the target function
+    file_lines = file_content.split("\n")
     context_functions = []
     print(target_function_name)
 
-    pattern = rf'^(?!.*#).*{re.escape(target_function_name)}.*'
-    
+    pattern = rf"^(?!.*#).*{re.escape(target_function_name)}.*"
+
     # Compile the regex pattern
     regex = re.compile(pattern, re.MULTILINE)
-    
+
     # Find all matches in the file content
     pre_matches = regex.findall(file_content)
-    
-    modified_pattern = rf'\w{re.escape(target_function_name)}\b'
-    
+
+    modified_pattern = rf"\w{re.escape(target_function_name)}\b"
+
     # Iterate over the list of matches
     filtered_matches = []
 
@@ -108,30 +121,53 @@ def extract_context_functions(file_content, target_function_name, full_functions
         # Check if the match contains 'def' and should be excluded
         if "def" in match:
             continue
-        
+
         # Check if the target function name is modified
         if re.search(modified_pattern, match):
             continue
 
         if "__" in match:
             continue
-        
+
         # If neither condition is met, keep the match
         filtered_matches.append(match)
-        
-            
-    print(filtered_matches)
-    
 
-    
+    for match in filtered_matches:
+        # Find the line number of the match
+        for i, line in enumerate(file_lines):
+            if line.strip() == match.strip():
+                match_line_index = i
+                break
+        stop = False
+        # Get the indentation of the matched function line
+        match_indentation = len(match) - len(match.lstrip())
+        # print(f"Function: {match} | Indentation: {match_indentation}")
+        # print(f"function index line: {match_line_index}")
 
+        # Go above the match line by line
+        for j in range(match_line_index - 1, -1, -1):
+            line = file_lines[j]
+            line_indentation = len(line) - len(line.lstrip())
+            # print(f"line: {line} | Indentation: {line_indentation}, function name: {get_function_name(line)}")
 
-    # file = extract_function_block_from_file(target_function_name, file_content)
+            # Check if the line has indentation of zero
+            if target_function_name == "main":
+                break
+            if (
+                line_indentation == 0
+                and line != ""
+                and get_function_name(line) != target_function_name
+                and line not in context_functions
+                and "__" not in line
+            ):
+                context_functions.append(line.strip())
+                stop = True
+                break
 
+        if stop:
+            break
 
-
-
-    return []
+    return context_functions
 
 
 def extract_function_block_from_file(name, file_content):
