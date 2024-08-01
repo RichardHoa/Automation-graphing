@@ -187,8 +187,8 @@ def text_to_textnodes(text):
     bold = split_nodes_delimiter([TextNode(text, "text")], "**", "bold")
     italic = split_nodes_delimiter(bold, "*", "italic")
     code = split_nodes_delimiter(italic, "`", "code")
-
-    return split_nodes_link(split_nodes_image(code))
+    image = split_nodes_image(code)
+    return split_nodes_link(image)
 
 
 

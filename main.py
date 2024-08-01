@@ -1,7 +1,7 @@
 import os
 import re
 import io
-
+import json
 
 def main():
     copy_main_py()
@@ -12,34 +12,38 @@ def main():
         content = file.read()
 
     all_functions = extract_all_functions(content, special_funcs)
-    # print(all_functions)
+    print(f"all functions:{all_functions}")
 
-    for i in range(0, 2):
+    for i in range(0, 7):
         function = all_functions[i]
         full_function = all_functions[i].replace("def ", "").replace(":", "")
         function_name = get_function_name(function)
         context_functions_list = extract_context_functions(
             content, function_name, all_functions
         )
-
-        print("-------------------")
+        print("------------------------------------------------")
         print(f"full function: {full_function}")
         print(f"function name: {function_name}")
         print(f"context functions: {context_functions_list}")
-        if len (context_functions_list) == 0:
+        if len(context_functions_list) == 0:
             function_order_dict[full_function] = {}
         else:
             for function in context_functions_list:
+                print("----------")
+                print(f'function: {function}')
                 context_function_name = function.replace("def ", "").replace(":", "")
-                # print("context function name: " + context_function_name)
-                insert_in_nested_dict(function_order_dict, context_function_name, full_function)
+                print("context function: " + context_function_name)
+                insert_in_nested_dict(
+                    function_order_dict, context_function_name, full_function
+                )
                 pass
 
         # for function in context_functions_list:
         #     identation = len(function) - len(function.lstrip())
         #     print(f"function: {function}")
 
-    print(f"function order dist: {function_order_dict}")
+    print("------------------------------------------------------------------")
+    print(f"function order dist: {json.dumps(function_order_dict, indent=4)}")
 
 
 def copy_main_py():
@@ -102,7 +106,7 @@ def extract_context_functions(file_content, target_function_name, full_functions
     # Initialize a list to store function definitions that call the target function
     file_lines = file_content.split("\n")
     context_functions = []
-    print(target_function_name)
+    # print(target_function_name)
 
     pattern = rf"^(?!.*#).*{re.escape(target_function_name)}.*"
 
@@ -111,6 +115,7 @@ def extract_context_functions(file_content, target_function_name, full_functions
 
     # Find all matches in the file content
     pre_matches = regex.findall(file_content)
+    # print(f"pre matches: {pre_matches}")
 
     modified_pattern = rf"\w{re.escape(target_function_name)}\b"
 
@@ -118,55 +123,77 @@ def extract_context_functions(file_content, target_function_name, full_functions
     filtered_matches = []
 
     for match in pre_matches:
+        result = re.search(modified_pattern, match) 
         # Check if the match contains 'def' and should be excluded
         if "def" in match:
+            print("def in match: " + match)
             continue
-
+        # print(f"matches: {match}")
         # Check if the target function name is modified
-        if re.search(modified_pattern, match):
+        if result:
+            print("modified pattern: " + result.group())
             continue
 
         if "__" in match:
+            print("__ in match: " + match)
+            continue
+
+        if get_function_name(match) != target_function_name:
+            # if target_function_name not in match:
             continue
 
         # If neither condition is met, keep the match
         filtered_matches.append(match)
 
+    # print("----------------------------------------------")
+
+    # print(f"filtered matches: {filtered_matches}")
+    # print(f"target function name: {target_function_name}")
     for match in filtered_matches:
         # Find the line number of the match
         for i, line in enumerate(file_lines):
             if line.strip() == match.strip():
                 match_line_index = i
                 break
-        stop = False
         # Get the indentation of the matched function line
         match_indentation = len(match) - len(match.lstrip())
+        # print("---")
         # print(f"Function: {match} | Indentation: {match_indentation}")
-        # print(f"function index line: {match_line_index}")
+        # print(f"function index line: {match_line_index + 1}")
+        # print("---")
 
         # Go above the match line by line
         for j in range(match_line_index - 1, -1, -1):
             line = file_lines[j]
             line_indentation = len(line) - len(line.lstrip())
-            # print(f"line: {line} | Indentation: {line_indentation}, function name: {get_function_name(line)}")
-
+            # print("-")
+            # print(f"context function: {context_functions}")
+            # print(f"line: {line} | Indentation: {line_indentation}, function name: {get_function_name(line)},line not in context: {line not in context_functions}, not {not re.search(r"__\w+__", line)}")
             # Check if the line has indentation of zero
             if target_function_name == "main":
                 break
             if (
                 line_indentation == 0
+                and get_function_name(line) == target_function_name
+            ):
+                # print("This function refers to itself")
+                break
+
+            if (
+                line_indentation == 0
                 and line != ""
                 and get_function_name(line) != target_function_name
                 and line not in context_functions
-                and "__" not in line
+                and not re.search(r"__\w+__", line)
             ):
-                context_functions.append(line.strip())
-                stop = True
-                break
-
-        if stop:
-            break
-
+                function_block = extract_function_block_from_file(get_function_name(line), file_content)
+                if target_function_name in function_block:
+                # print(f"Have found a context function call at line {j + 1} with function name: {get_function_name(line)}")
+                    context_functions.append(line.strip())
+                    break
+    
+    # print("-------")
+    # print(f"Context functions: {context_functions}")
     return context_functions
 
 
@@ -207,106 +234,7 @@ def extract_function_block_from_file(name, file_content):
             return "".join(function_lines)
 
     return None
-
-
-# def get_function_r(function_block, content, function_order):
-#     # Turn the function block into array of function lines
-#     function_lines = function_block.splitlines()
-#     # Turn function lines into list of functions
-#     function_list = get_functions(function_lines)
-
-#     # print(f"function block: {function_block}")
-#     # print("\n\n")
-#     print(f"functions list from the block: {function_list}")
-#     # print("\n\n")
-
-#     for function in function_list:
-#         function_name = get_function_name(function)
-#         print("---------------------------")
-#         print("function: ", function)
-#         print("function name: ", function_name)
-#         function_block_code = extract_function_block_from_file(function_name, content)
-#         # If function_block_code is not found -> there is no nested functions inside this function
-#         if not function_block_code:
-#             # If function name contains . -> it is a library function
-#             if "." in function_name:
-#                 print(f"Library function: {function_name}")
-#             # Else it's a normal function, add this to the function_order
-#             else:
-#                 function_order.append(function)
-#                 print(f"Function order end: {function_order}")
-#         else:
-#             # print(f"block code: {function_block_code} from the function: {function_name}")
-
-#             # Get the name of the funtion_block_code
-#             # function_block_code_name = get_function_name(function_block_code.split("\n")[0])
-
-#             if function in function_block_code:
-
-#                 if any(
-#                     function_name == get_function_name(sublist)
-#                     for sublist in function_order
-#                 ):
-#                     print(f"Function already added:  {function_name} ")
-#                     print(f"function order: {function_order}")
-#                     continue
-#                 else:
-#                     print(f"order_list: {function_order}")
-#                     function_order.append(function)
-#                 print(f"function_block_code: {function_block_code}")
-#                 print(f"recursive function found:  {function_name} ")
-#             else:
-#                 # If it's not a recursive functions, continue to find the deeper functions
-#                 get_function_r(function_block_code, content, function_order)
-
-
-# def get_functions(function_lines):
-#     # function_list = []
-#     # for line in function_lines:
-#     #     stripped_line = line.strip()
-#     #     # Check if the line represents a function
-#     #     if (
-#     #         stripped_line
-#     #         and not stripped_line.startswith("#")
-#     #         and re.search(r"\(.*\)", stripped_line)
-#     #         and "def" not in stripped_line
-#     #         and "print" not in stripped_line
-#     #     ):
-#     #         function_list.append(line)
-#     # return function_list
-#     function_calls = []
-#     function_block = []
-#     parathesis_counter = 0
-
-#     for line in function_lines:
-#         stripped_line = line.strip()
-#         if (
-#             not stripped_line
-#             or stripped_line.startswith("#")
-#             or "main" in stripped_line
-#         ):
-#             continue
-
-#         parathesis_counter += stripped_line.count("(") - stripped_line.count(")")
-#         function_block.append(line)
-
-#         if parathesis_counter <= 0 and function_block:
-#             complete_function_call = " ".join(
-#                 [block_line.strip() for block_line in function_block]
-#             )
-#             complete_function_call_name = get_function_name(complete_function_call)
-#             if (
-#                 "(" in complete_function_call
-#                 and ")" in complete_function_call
-#                 and "_" in complete_function_call_name
-#                 and "." not in complete_function_call_name
-#             ):
-#                 function_calls.append(complete_function_call)
-#             function_block = []
-
-#     return function_calls
-
-
+    
 def get_function_name(one_line_function):
     return one_line_function.split("(")[0].strip().split(" ")[-1]
 
@@ -348,17 +276,42 @@ def extract_all_functions(file_content, special_funcs):
 
 def insert_in_nested_dict(nested_dict, target_key, new_value):
     stack = [(nested_dict, target_key)]
+    # print("----------")
+    # print("Initial stack: " + str(stack))
+    print("new value: " + str(new_value))
+    print(f"target key: {target_key}")
+    print(json.dumps(nested_dict, indent=4))
 
     while stack:
         current_dict, key_to_find = stack.pop()
+        # print("-")
+        # print("Current dict: " + str(current_dict))
+        # print("Key to find: " + str(key_to_find))
+        for children_key in nested_dict["main()"]:
+            if children_key == target_key and new_value == "":
+                print("Children key equals target key")
+                return True
 
         if key_to_find in current_dict:
-            current_dict[key_to_find] = new_value
+            if new_value in current_dict[key_to_find]:
+                return True
+            # print(f"current dict keyt to find: {current_dict[key_to_find]}")
+            # If the key is found and the value is already a dictionary,
+            # add the new value to this dictionary
+            if isinstance(current_dict[key_to_find], dict):
+                print(f'current dict: {current_dict}')
+                current_dict[key_to_find][new_value] = {}
+            else:
+                # If the value is not a dictionary, create a new dictionary
+                current_dict[key_to_find] = {new_value: {}}
             return True
 
         for key, value in current_dict.items():
             if isinstance(value, dict):
                 stack.append((value, key_to_find))
+
+
+        nested_dict["main()"][target_key] = {}
 
     return False
 
