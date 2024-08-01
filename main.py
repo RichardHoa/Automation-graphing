@@ -13,27 +13,30 @@ def main():
         content = file.read()
 
     all_functions = extract_all_functions(content, special_funcs)
-    print(f"all functions:{all_functions}")
 
-    for i in range(0, 7):
+    # for i in range(len(all_functions)):
+    #     print(f"index: {i} | function {all_functions[i]}")
+
+
+    for i in range(0, len(all_functions)):
         function = all_functions[i]
         full_function = all_functions[i].replace("def ", "").replace(":", "")
         function_name = get_function_name(function)
         context_functions_list = extract_context_functions(
             content, function_name, all_functions
         )
-        print("------------------------------------------------")
-        print(f"full function: {full_function}")
-        print(f"function name: {function_name}")
-        print(f"context functions: {context_functions_list}")
+        # print("------------------------------------------------")
+        # print(f"full function: {full_function}")
+        # print(f"function name: {function_name}")
+        # print(f"context functions: {context_functions_list}")
         if len(context_functions_list) == 0:
             function_order_dict[full_function] = {}
         else:
             for function in context_functions_list:
-                print("----------")
-                print(f"function: {function}")
+                # print("----------")
+                # print(f"function: {function}")
                 context_function_name = function.replace("def ", "").replace(":", "")
-                print("context function: " + context_function_name)
+                # print("context function: " + context_function_name)
                 insert_in_nested_dict(
                     function_order_dict, context_function_name, full_function
                 )
@@ -121,33 +124,39 @@ def extract_context_functions(file_content, target_function_name, full_functions
     modified_pattern = rf"\w{re.escape(target_function_name)}\b"
 
     # Iterate over the list of matches
-    filtered_matches = []
+    stage_2_matches = []
 
     for match in pre_matches:
         result = re.search(modified_pattern, match)
         # Check if the match contains 'def' and should be excluded
         if "def" in match:
-            print("def in match: " + match)
+            # print("def in match: " + match)
             continue
         # print(f"matches: {match}")
         # Check if the target function name is modified
         if result:
-            print("modified pattern: " + result.group())
+            # print("modified pattern: " + result.group())
             continue
 
         if "__" in match:
-            print("__ in match: " + match)
+            # print("__ in match: " + match)
             continue
 
         if get_function_name(match) != target_function_name:
             # if target_function_name not in match:
             continue
 
+        if match in stage_2_matches:
+            continue
+
         # If neither condition is met, keep the match
-        filtered_matches.append(match)
+        stage_2_matches.append(match)
 
     # print("----------------------------------------------")
 
+
+    filtered_matches = list(set(stage_2_matches))
+    
     # print(f"filtered matches: {filtered_matches}")
     # print(f"target function name: {target_function_name}")
     for match in filtered_matches:
@@ -186,10 +195,14 @@ def extract_context_functions(file_content, target_function_name, full_functions
                 and get_function_name(line) != target_function_name
                 and line not in context_functions
                 and not re.search(r"__\w+__", line)
+                and "#" not in line
             ):
                 function_block = extract_function_block_from_file(
                     get_function_name(line), file_content
                 )
+                if not function_block:
+                    break
+                # print(f"function block: {function_block}")
                 if target_function_name in function_block:
                     # print(f"Have found a context function call at line {j + 1} with function name: {get_function_name(line)}")
                     context_functions.append(line.strip())
@@ -285,7 +298,7 @@ def insert_in_nested_dict(nested_dict, target_key, new_value):
             # If the current value is a dictionary, add the new value
             if isinstance(current_dict[target_key], dict):
                 if target_key in current_dict:
-                    print(f"target key: {target_key} | current_dict:  {current_dict} | new_value: {new_value}")
+                    # print(f"target key: {target_key} | current_dict:  {current_dict} | new_value: {new_value}")
                     if new_value not in current_dict[target_key]:
                         current_dict[target_key][new_value] = {}
             else:
@@ -303,9 +316,10 @@ def insert_in_nested_dict(nested_dict, target_key, new_value):
 
     if not helper(nested_dict, target_key, new_value):
         # If the target key was not found in the nested dict, add it at the top level
-        print(f"Nested list duplicated: {nested_dict}")
+        # print(f"Nested list duplicated: {nested_dict}")
         if target_key in nested_dict:
-            print("Duplicate function name")
+            # print("Duplicate function name")
+            pass
         else: 
             nested_dict["main()"][target_key] = {new_value: {}}
 

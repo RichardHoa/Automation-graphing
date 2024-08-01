@@ -355,7 +355,8 @@ def helper_markdown_to_html_paragraph(block, props_list):
     children_leaf_node_list = []
     text_nodes = text_to_textnodes(block)
     for text_node in text_nodes:
-        children_leaf_node_list.append(text_node_to_html_node(text_node))
+        html_node = text_node_to_html_node(text_node)
+        children_leaf_node_list.append(html_node)
     props_list.append(ParentNode(tag="p", children=children_leaf_node_list))
 
 def helper_markdown_to_html_list(block):
@@ -377,21 +378,22 @@ def helper_markdown_to_html_list(block):
         text_nodes = text_to_textnodes(formatted_line)
         for text_node in text_nodes:
             # For every text node, add it html node version to the children list of the parent li node
-            li_children_list.append(text_node_to_html_node(text_node))
+            singular_html_node = text_node_to_html_node(text_node)
+            li_children_list.append(singular_html_node)
 
         list_children_nodes.append(ParentNode(tag="li", children=li_children_list))
         counter_ordererd_list += 1 
     return list_children_nodes
 
 def extract_title(markdown):
-    blocks = markdown_to_blocks(markdown)
+    markdown_blocks = markdown_to_blocks(markdown)
     
     
-    block_type = block_to_block_type(blocks[0])
+    block_type = block_to_block_type(markdown_blocks[0])
     # print(block_type)
     if block_type == "heading":
         # print(blocks[0])
-        return blocks[0].removeprefix("# ").strip()
+        return markdown_blocks[0].removeprefix("# ").strip()
     else:
         raise Exception("A post must have an h1 header")
 
