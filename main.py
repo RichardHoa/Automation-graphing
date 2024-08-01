@@ -3,6 +3,7 @@ import re
 import io
 import json
 
+
 def main():
     copy_main_py()
     function_order_dict = {}
@@ -30,7 +31,7 @@ def main():
         else:
             for function in context_functions_list:
                 print("----------")
-                print(f'function: {function}')
+                print(f"function: {function}")
                 context_function_name = function.replace("def ", "").replace(":", "")
                 print("context function: " + context_function_name)
                 insert_in_nested_dict(
@@ -123,7 +124,7 @@ def extract_context_functions(file_content, target_function_name, full_functions
     filtered_matches = []
 
     for match in pre_matches:
-        result = re.search(modified_pattern, match) 
+        result = re.search(modified_pattern, match)
         # Check if the match contains 'def' and should be excluded
         if "def" in match:
             print("def in match: " + match)
@@ -186,12 +187,14 @@ def extract_context_functions(file_content, target_function_name, full_functions
                 and line not in context_functions
                 and not re.search(r"__\w+__", line)
             ):
-                function_block = extract_function_block_from_file(get_function_name(line), file_content)
+                function_block = extract_function_block_from_file(
+                    get_function_name(line), file_content
+                )
                 if target_function_name in function_block:
-                # print(f"Have found a context function call at line {j + 1} with function name: {get_function_name(line)}")
+                    # print(f"Have found a context function call at line {j + 1} with function name: {get_function_name(line)}")
                     context_functions.append(line.strip())
                     break
-    
+
     # print("-------")
     # print(f"Context functions: {context_functions}")
     return context_functions
@@ -234,7 +237,8 @@ def extract_function_block_from_file(name, file_content):
             return "".join(function_lines)
 
     return None
-    
+
+
 def get_function_name(one_line_function):
     return one_line_function.split("(")[0].strip().split(" ")[-1]
 
@@ -275,45 +279,35 @@ def extract_all_functions(file_content, special_funcs):
 
 
 def insert_in_nested_dict(nested_dict, target_key, new_value):
-    stack = [(nested_dict, target_key)]
-    # print("----------")
-    # print("Initial stack: " + str(stack))
-    print("new value: " + str(new_value))
-    print(f"target key: {target_key}")
-    print(json.dumps(nested_dict, indent=4))
-
-    while stack:
-        current_dict, key_to_find = stack.pop()
-        # print("-")
-        # print("Current dict: " + str(current_dict))
-        # print("Key to find: " + str(key_to_find))
-        for children_key in nested_dict["main()"]:
-            if children_key == target_key and new_value == "":
-                print("Children key equals target key")
-                return True
-
-        if key_to_find in current_dict:
-            if new_value in current_dict[key_to_find]:
-                return True
-            # print(f"current dict keyt to find: {current_dict[key_to_find]}")
-            # If the key is found and the value is already a dictionary,
-            # add the new value to this dictionary
-            if isinstance(current_dict[key_to_find], dict):
-                print(f'current dict: {current_dict}')
-                current_dict[key_to_find][new_value] = {}
+    def helper(current_dict, target_key, new_value):
+        # Base case: if the target key is found
+        if target_key in current_dict:
+            # If the current value is a dictionary, add the new value
+            if isinstance(current_dict[target_key], dict):
+                if target_key in current_dict:
+                    print(f"target key: {target_key} | current_dict:  {current_dict} | new_value: {new_value}")
+                    if new_value not in current_dict[target_key]:
+                        current_dict[target_key][new_value] = {}
             else:
-                # If the value is not a dictionary, create a new dictionary
-                current_dict[key_to_find] = {new_value: {}}
+                # Otherwise, replace the current value with a new dictionary
+                current_dict[target_key] = {new_value: {}}
             return True
 
+        # Recursive case: traverse the nested dictionaries
         for key, value in current_dict.items():
             if isinstance(value, dict):
-                stack.append((value, key_to_find))
+                if helper(value, target_key, new_value):
+                    return True
 
+        return False
 
-        nested_dict["main()"][target_key] = {}
-
-    return False
+    if not helper(nested_dict, target_key, new_value):
+        # If the target key was not found in the nested dict, add it at the top level
+        print(f"Nested list duplicated: {nested_dict}")
+        if target_key in nested_dict:
+            print("Duplicate function name")
+        else: 
+            nested_dict["main()"][target_key] = {new_value: {}}
 
 
 if __name__ == "__main__":
