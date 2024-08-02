@@ -7,22 +7,30 @@ from tkinter import Canvas, font
 
 
 def main():
+    # Copy all the code from the directory to copy_functions.txt
     copy_main_py()
+    # A dictionary to store all the functions and their order
     function_order_dict = {}
+    # Functions to be ignored when searching for function
     special_funcs = ["def to_html(self):", "def props_to_html(self):"]
 
+    # Read the content of copy_functions.txt
     with open("copy_functions.txt", "r") as file:
         content = file.read()
 
+    # Extract all functions from the copy_functions.txt
     all_functions = extract_all_functions(content, special_funcs)
 
-    # for i in range(len(all_functions)):
-    #     print(f"index: {i} | function {all_functions[i]}")
-
+    # For each of the function
     for i in range(0, len(all_functions)):
+        # Get the function
         function = all_functions[i]
+        # function example: helper_function(self, param1, param2)
         full_function = all_functions[i].replace("def ", "").replace(":", "")
+        # Function name example: helper_function
         function_name = get_function_name(function)
+        # Find all the context function of the function,
+        # context function is defined as the function that call this function
         context_functions_list = extract_context_functions(
             content, function_name, all_functions
         )
@@ -30,18 +38,20 @@ def main():
         # print(f"full function: {full_function}")
         # print(f"function name: {function_name}")
         # print(f"context functions: {context_functions_list}")
+        # if there is no context function, insert the function into the dict
         if len(context_functions_list) == 0:
             function_order_dict[full_function] = {}
         else:
             for function in context_functions_list:
                 # print("----------")
                 # print(f"function: {function}")
+                # Context function name example: helper_markdown_to_html_paragraph
                 context_function_name = function.replace("def ", "").replace(":", "")
                 # print("context function: " + context_function_name)
+                # Insert the function into the ALMOST CORRECT position in the dict
                 insert_in_nested_dict(
                     function_order_dict, context_function_name, full_function
                 )
-                pass
 
         # for function in context_functions_list:
         #     identation = len(function) - len(function.lstrip())
@@ -54,95 +64,118 @@ def main():
     #     "text_to_textnodes(text)"
     # ]
 
+    # Get all the outer keys in the dict
     outer_keys = list(function_order_dict["main()"].keys())
-    global_list = []
+
+    # Context function list stores all the function with its context parents
+    # Ex: ['main()', 'main()copy_folder(source, destination)']
+    context_function_list = []
+
+    # Deleted function list stores all the functions that will be deleted at the end
     deleted_func = []
 
-    def print_keys(dictionary, prefix=""):
-        for key, value in dictionary.items():
-            global_list.append(f"{prefix}{key}")
-            if isinstance(value, dict):
-                print_keys(value, prefix + key)
+    # Add context functions to the context_function_list
+    add_context_function_list(function_order_dict, "", context_function_list)
 
-    print_keys(function_order_dict)
-
-    for single_list in global_list:
-        functions = single_list.split(")")
+    # Function to modify the current dict to make it into CORRECT format
+    for one_context_function_list in context_function_list:
+        # Multiple functions in one_context_function_list
+        functions = one_context_function_list.split(")")
+        # Prepare parents function string
         parent_functions_string = ""
 
+        # Find parent functions of the current function
+        # functions[:-1] because the last item in the functions list is always empty string
         for function in functions[:-1]:
             if function == "main(":
-                one_function = f"'{function})'"
+                singular_function = f"'{function})'"
             else:
-                one_function = f",'{function})'"
-            parent_functions_string += one_function
+                singular_function = f",'{function})'"
+            parent_functions_string += singular_function
 
+        # Get the function name
         function_name = functions[-2] + ")"
 
+        # If function name in the outer keys and there are more than 2 functions in the parent functions
+        # Each function always has 2 parent functions: main and itself
         if function_name in outer_keys and parent_functions_string.count("'") > 4:
+            # Convert the string into list
             parent_functions_list = string_to_list(parent_functions_string)
-            print("--------------------------")
-            print("Change structure")
-            print(f"function_name: {function_name}")
-            print(f"parent functions: {parent_functions_list}")
-            access_dict_value(
+            # print("--------------------------")
+            # print("Change structure")
+            # print(f"function_name: {function_name}")
+            # print(f"parent functions: {parent_functions_list}")
+            # We format the dictionary again, make sure it's in the nested format
+
+            replace_value_nested_dictionary(
                 function_order_dict,
                 parent_functions_list,
                 function_order_dict["main()"][function_name],
             )
+            # If the
             deleted_func.append(function_name)
 
+    # Remove all duplicate in deleted_func
     deleted_func = list(set(deleted_func))
 
-    # access_dict_value(
-    #     function_order_dict,
-    #     [
-    #         "main()",
-    #         "generate_pages_recursive(dir_path_content, template_path, dest_dir_path)",
-    #         "generate_page(from_path, template_path, dest_path)",
-    #         "markdown_to_html_node(markdown)",
-    #         "helper_markdown_to_html_paragraph(block, props_list)",
-    #     ],
-    #     function_order_dict["main()"][
-    #         "helper_markdown_to_html_paragraph(block, props_list)"
-    #     ],
-    # )
-
+    # Delete all the functions in deleted_func
     for function in deleted_func:
-        # print(f" delete function: {function}")
         del function_order_dict["main()"][function]
     # print(f"delete function: {deleted_func}")
     # print(f"function order dist: {json.dumps(function_order_dict, indent=4)}")
 
+    # Generate the HTML content
+    html_content = dict_to_html(function_order_dict)
 
-    markdown = dict_to_markdown(function_order_dict)
-    with open("result.md", "w") as file:
-        file.write(markdown) 
+    # Full HTML document structure
+    full_html = f"""<!DOCTYPE html>
+    <html>
+    <head>
+        <title>Dictionary to HTML</title>
+    </head>
+    <body>
+    {html_content}
+    </body>
+    </html>"""
 
-    
-    
-    
-def dict_to_markdown(data, indent=0):
-    markdown = ""
-    for key, value in data.items():
-        markdown += "  " * indent + f"- {key}\n"
+    # Write the HTML content to a file
+    with open("result.html", "w") as file:
+        file.write(full_html)
+
+
+def dict_to_html(dictionary, indent=1):
+    html = ""
+    for key, value in dictionary.items():
+        # Heading does not exceed 4
+        heading_level = min(indent, 4)  
+        # Set style for indentation
+        indent_style = f"style='margin-left: {40 * (indent - 1)}px;'" 
+        html += f"<h{heading_level} {indent_style}>{key}</h{heading_level}>\n"
         if isinstance(value, dict):
-            markdown += dict_to_markdown(value, indent + 1)
-    return markdown
+            html += dict_to_html(value, indent + 1)
+    return html
+
 
 def string_to_list(input_string):
     return re.findall(r"'([^']*)'", input_string)
 
 
-def access_dict_value(dictionary, indices, new_value):
+def add_context_function_list(dictionary, prefix="", context_function_list=[]):
+    for key, value in dictionary.items():
+        context_function_list.append(f"{prefix}{key}")
+        if isinstance(value, dict):
+            add_context_function_list(value, prefix + key, context_function_list)
+    return context_function_list
+
+def replace_value_nested_dictionary(dictionary, path_to_key, new_key_value):
     value = dictionary
-    for index in indices[:-1]:
+    for index in path_to_key[:-1]:
         value = value.get(index)
         if value is None:
             return None
-    last_index = indices[-1]
-    value[last_index] = new_value
-    return new_value
+    last_index = path_to_key[-1]
+    value[last_index] = new_key_value
+    return new_key_value
 
 
 def copy_main_py():
@@ -165,7 +198,7 @@ def copy_main_py():
     with open(main_py_path, "r") as file:
         content = file.read()
 
-    # Store the content into another file, appending if the file already exists
+    # Store the content into another file,
     output_file_path = "copy_functions.txt"
 
     # Check if the file exists
@@ -183,10 +216,7 @@ def copy_main_py():
         for f in os.listdir(main_py_dir)
         if f.endswith(".py") and "test" not in f and f != "main.py"
     ]
-
-    # print(
-    #     "\nPython files in the same directory as main.py (excluding those with 'test' in the name):"
-    # )
+    
     for py_file in py_files:
         file_path = os.path.join(code_file_path, py_file)
         # print(file_path)
@@ -331,7 +361,10 @@ def extract_function_block_from_file(name, file_content):
             # Handle the case where we are inside the function
             if inside_function:
                 if (
-                    stripped_line.startswith("def ")
+                    (
+                        stripped_line.startswith("def ")
+                        or stripped_line.startswith("class ")
+                    )
                     and current_indent == indent_level
                     and len(stripped_line) > 0
                 ):
