@@ -2,6 +2,8 @@ import os
 import re
 import io
 import json
+import tkinter as tk
+from tkinter import Canvas, font
 
 
 def main():
@@ -16,7 +18,6 @@ def main():
 
     # for i in range(len(all_functions)):
     #     print(f"index: {i} | function {all_functions[i]}")
-
 
     for i in range(0, len(all_functions)):
         function = all_functions[i]
@@ -47,7 +48,101 @@ def main():
         #     print(f"function: {function}")
 
     print("------------------------------------------------------------------")
-    print(f"function order dist: {json.dumps(function_order_dict, indent=4)}")
+    # function_order_dict["main()"][
+    #     "helper_markdown_to_html_paragraph(block, props_list)"
+    # ]["text_to_textnodes(text)"] = function_order_dict["main()"][
+    #     "text_to_textnodes(text)"
+    # ]
+
+    outer_keys = list(function_order_dict["main()"].keys())
+    global_list = []
+    deleted_func = []
+
+    def print_keys(dictionary, prefix=""):
+        for key, value in dictionary.items():
+            global_list.append(f"{prefix}{key}")
+            if isinstance(value, dict):
+                print_keys(value, prefix + key)
+
+    print_keys(function_order_dict)
+
+    for single_list in global_list:
+        functions = single_list.split(")")
+        parent_functions_string = ""
+
+        for function in functions[:-1]:
+            if function == "main(":
+                one_function = f"'{function})'"
+            else:
+                one_function = f",'{function})'"
+            parent_functions_string += one_function
+
+        function_name = functions[-2] + ")"
+
+        if function_name in outer_keys and parent_functions_string.count("'") > 4:
+            parent_functions_list = string_to_list(parent_functions_string)
+            print("--------------------------")
+            print("Change structure")
+            print(f"function_name: {function_name}")
+            print(f"parent functions: {parent_functions_list}")
+            access_dict_value(
+                function_order_dict,
+                parent_functions_list,
+                function_order_dict["main()"][function_name],
+            )
+            deleted_func.append(function_name)
+
+    deleted_func = list(set(deleted_func))
+
+    # access_dict_value(
+    #     function_order_dict,
+    #     [
+    #         "main()",
+    #         "generate_pages_recursive(dir_path_content, template_path, dest_dir_path)",
+    #         "generate_page(from_path, template_path, dest_path)",
+    #         "markdown_to_html_node(markdown)",
+    #         "helper_markdown_to_html_paragraph(block, props_list)",
+    #     ],
+    #     function_order_dict["main()"][
+    #         "helper_markdown_to_html_paragraph(block, props_list)"
+    #     ],
+    # )
+
+    for function in deleted_func:
+        # print(f" delete function: {function}")
+        del function_order_dict["main()"][function]
+    # print(f"delete function: {deleted_func}")
+    # print(f"function order dist: {json.dumps(function_order_dict, indent=4)}")
+
+
+    markdown = dict_to_markdown(function_order_dict)
+    with open("result.md", "w") as file:
+        file.write(markdown) 
+
+    
+    
+    
+def dict_to_markdown(data, indent=0):
+    markdown = ""
+    for key, value in data.items():
+        markdown += "  " * indent + f"- {key}\n"
+        if isinstance(value, dict):
+            markdown += dict_to_markdown(value, indent + 1)
+    return markdown
+
+def string_to_list(input_string):
+    return re.findall(r"'([^']*)'", input_string)
+
+
+def access_dict_value(dictionary, indices, new_value):
+    value = dictionary
+    for index in indices[:-1]:
+        value = value.get(index)
+        if value is None:
+            return None
+    last_index = indices[-1]
+    value[last_index] = new_value
+    return new_value
 
 
 def copy_main_py():
@@ -154,9 +249,8 @@ def extract_context_functions(file_content, target_function_name, full_functions
 
     # print("----------------------------------------------")
 
-
     filtered_matches = list(set(stage_2_matches))
-    
+
     # print(f"filtered matches: {filtered_matches}")
     # print(f"target function name: {target_function_name}")
     for match in filtered_matches:
@@ -320,7 +414,7 @@ def insert_in_nested_dict(nested_dict, target_key, new_value):
         if target_key in nested_dict:
             # print("Duplicate function name")
             pass
-        else: 
+        else:
             nested_dict["main()"][target_key] = {new_value: {}}
 
 
