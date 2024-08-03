@@ -1,7 +1,6 @@
 import os
 import re
 import io
-import json
 import tkinter as tk
 from tkinter import Canvas, font
 
